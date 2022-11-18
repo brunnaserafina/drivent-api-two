@@ -1,7 +1,7 @@
 import { notFoundError, unauthorizedError } from "@/errors";
 import ticketsRepository from "@/repositories/tickets-repository/index";
 import paymentsRepository from "@/repositories/payments-repository/index";
-import { PaymentsEntity } from "@/protocols";
+import { CardData, PaymentsEntity } from "@/protocols";
 
 async function getPaymentByTicketId(ticketId: number, userId: number): Promise<PaymentsEntity> {
   const ticket = await ticketsRepository.findFirstByTicketId(ticketId);
@@ -15,6 +15,25 @@ async function getPaymentByTicketId(ticketId: number, userId: number): Promise<P
   return payment;
 }
 
-const paymentsService = { getPaymentByTicketId };
+async function postPayment(ticketId: number, userId: number, cardData: CardData): Promise<PaymentsEntity> {
+  const ticket = await ticketsRepository.findFirstByTicketId(ticketId);
+  if (!ticket) throw notFoundError();
+
+  if (ticket.Enrollment.userId !== userId) throw unauthorizedError();
+
+  const value: number = ticket.TicketType.price;
+
+  const postedPayment = await paymentsRepository.create(ticketId, cardData, value);
+  if (!postedPayment) throw notFoundError();
+
+  await ticketsRepository.update(ticketId);
+
+  const payment = await paymentsRepository.findFirst(ticketId);
+  if (!payment) throw notFoundError();
+
+  return payment;
+}
+
+const paymentsService = { getPaymentByTicketId, postPayment };
 
 export default paymentsService;
