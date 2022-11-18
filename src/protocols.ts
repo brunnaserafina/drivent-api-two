@@ -48,6 +48,16 @@ export type TicketsEntity = {
   updatedAt: Date;
 };
 
+export type PaymentsEntity = {
+  id: number;
+  ticketId: number;
+  value: number;
+  cardIssuer: string;
+  cardLastDigits: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 export type RequestError = {
   status: number;
   data: object | null;
