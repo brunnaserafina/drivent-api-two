@@ -1,13 +1,20 @@
 import { notFoundError, unauthorizedError } from "@/errors";
 import ticketsRepository from "@/repositories/tickets-repository/index";
 import paymentsRepository from "@/repositories/payments-repository/index";
-import { CardData, PaymentsEntity } from "@/protocols";
+import { CardData, PaymentsEntity, TicketsEntity } from "@/protocols";
+import { exclude } from "@/utils/prisma-utils";
 
-async function getPaymentByTicketId(ticketId: number, userId: number): Promise<PaymentsEntity> {
-  const ticket = await ticketsRepository.findFirstByTicketId(ticketId);
+async function compareTicketIdByUserId(ticketId: number, userId: number): Promise<TicketsEntity> {
+  const ticket = await ticketsRepository.findFirstTicketById(ticketId);
   if (!ticket) throw notFoundError();
 
   if (ticket.Enrollment.userId !== userId) throw unauthorizedError();
+
+  return exclude(ticket, "Enrollment");
+}
+
+async function getPaymentByTicketId(ticketId: number, userId: number): Promise<PaymentsEntity> {
+  await compareTicketIdByUserId(ticketId, userId);
 
   const payment = await paymentsRepository.findFirst(ticketId);
   if (!payment) throw notFoundError();
@@ -16,22 +23,14 @@ async function getPaymentByTicketId(ticketId: number, userId: number): Promise<P
 }
 
 async function postPayment(ticketId: number, userId: number, cardData: CardData): Promise<PaymentsEntity> {
-  const ticket = await ticketsRepository.findFirstByTicketId(ticketId);
-  if (!ticket) throw notFoundError();
+  const ticket = await compareTicketIdByUserId(ticketId, userId);
 
-  if (ticket.Enrollment.userId !== userId) throw unauthorizedError();
-
-  const value: number = ticket.TicketType.price;
-
-  const postedPayment = await paymentsRepository.create(ticketId, cardData, value);
+  const postedPayment = await paymentsRepository.create(ticketId, cardData, ticket.TicketType.price);
   if (!postedPayment) throw notFoundError();
 
-  await ticketsRepository.update(ticketId);
+  await ticketsRepository.updateTicket(ticketId);
 
-  const payment = await paymentsRepository.findFirst(ticketId);
-  if (!payment) throw notFoundError();
-
-  return payment;
+  return await getPaymentByTicketId(ticketId, userId);
 }
 
 const paymentsService = { getPaymentByTicketId, postPayment };

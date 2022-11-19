@@ -1,6 +1,6 @@
+import { Request, Response } from "express";
 import { AuthenticatedRequest } from "@/middlewares";
 import ticketsService from "@/services/tickets-service";
-import { Request, Response } from "express";
 import httpStatus from "http-status";
 
 export async function getTicketsTypes(_req: Request, res: Response) {
@@ -13,27 +13,28 @@ export async function getTicketsTypes(_req: Request, res: Response) {
 }
 
 export async function getTicket(req: AuthenticatedRequest, res: Response) {
-  const userId = req.userId as number;
+  const { userId } = req;
 
   try {
-    const tickets = await ticketsService.getTicket(userId);
-    return res.status(httpStatus.OK).send(tickets);
+    const ticket = await ticketsService.getTicket(userId);
+    return res.status(httpStatus.OK).send(ticket);
   } catch (error) {
     return res.status(httpStatus.NOT_FOUND).send(error);
   }
 }
 
 export async function insertTicket(req: AuthenticatedRequest, res: Response) {
-  const userId = req.userId as number;
-  const ticketTypeId = req.body.ticketTypeId as number;
-
-  if (!ticketTypeId) return res.sendStatus(httpStatus.BAD_REQUEST);
+  const { ticketTypeId } = req.body;
+  const { userId } = req;
 
   try {
     await ticketsService.insertTicket(userId, ticketTypeId);
     const ticket = await ticketsService.getTicket(userId);
     return res.status(httpStatus.CREATED).send(ticket);
   } catch (error) {
-    return res.status(httpStatus.NOT_FOUND).send(error);
+    if (error.name === "NotFoundError") {
+      return res.status(httpStatus.NOT_FOUND).send(error);
+    }
+    return res.sendStatus(httpStatus.BAD_REQUEST);
   }
 }
